@@ -1,471 +1,1182 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Магические Кубики</title>
-    
-    <!-- Telegram Web App Script -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#faf6ef" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Подключаем Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- HTML2Canvas для скриншотов -->
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-
+    <title>Кости · Подсказка Интуиции</title>
     <style>
-        :root {
-            /* Базовые цвета (фоллбек) */
-            --bg-color: #ffffff;
-            --text-color: #000000;
-            --button-color: #3390ec;
-            --button-text-color: #ffffff;
-            --secondary-bg: #f1f1f1;
-            --card-bg: #ffffff;
-            --hint-color: #999999;
-            --shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
+      /* ── Tokens ─────────────────────────────────────────────────── */
+      :root {
+        --bg: #faf6ef;
+        --bg-soft: #f3ede1;
+        --ink: #2d2a44;
+        --ink-soft: #6b6680;
+        --accent: #7c6ad1;
+        --accent-deep: #5b4bb0;
+        --border: #e8dfd1;
+        --sat: env(safe-area-inset-top);
+        --sab: env(safe-area-inset-bottom);
+        --sal: env(safe-area-inset-left);
+        --sar: env(safe-area-inset-right);
+      }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            box-sizing: border-box;
-            /* Цвета будут переопределены JS-ом из темы Telegram */
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.3s, color 0.3s;
-            user-select: none; /* Чтобы не выделять текст при тапах */
-        }
+      @property --frx { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+      @property --fry { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 
-        h1 {
-            font-size: 24px;
-            margin: 10px 0 20px;
-            text-align: center;
-            font-weight: 700;
-        }
+      * { box-sizing: border-box; }
 
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-        }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: "Inter", system-ui, sans-serif;
+        color: var(--ink);
+        background-color: var(--bg);
+        background-image:
+          radial-gradient(circle at 20% 10%, rgba(124, 106, 209, 0.06), transparent 40%),
+          radial-gradient(circle at 80% 80%, rgba(210, 170, 120, 0.08), transparent 45%),
+          radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.6), transparent 60%);
+        -webkit-font-smoothing: antialiased;
+        overscroll-behavior-y: contain;
+        padding-top: var(--sat);
+        padding-bottom: var(--sab);
+        padding-left: var(--sal);
+        padding-right: var(--sar);
+        touch-action: manipulation;
+      }
 
-        input[type="number"] {
-            padding: 10px;
-            border-radius: 12px;
-            border: 1px solid var(--hint-color);
-            width: 60px;
-            text-align: center;
-            font-size: 18px;
-            background: var(--secondary-bg);
-            color: var(--text-color);
-            outline: none;
-        }
+      button {
+        font-family: inherit;
+        cursor: pointer;
+        touch-action: manipulation;
+        border: none;
+        background: none;
+        color: inherit;
+      }
+      button:disabled { opacity: 0.6; cursor: wait; }
+      @media (hover: none) and (pointer: coarse) {
+        button:active { opacity: 0.8; }
+      }
 
-        /* Область с кубиками, которую будем скринить */
-        #captureArea {
-            width: 100%;
-            padding: 20px;
-            background: var(--secondary-bg);
-            border-radius: 20px;
-            box-shadow: var(--shadow);
-            margin-bottom: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+      .font-display {
+        font-family: "Cormorant Garamond", "Georgia", serif;
+        letter-spacing: 0.01em;
+      }
 
-        .total-sum {
-            font-size: 42px;
-            font-weight: 800;
-            margin: 10px 0 20px;
-            color: var(--button-color);
-        }
+      /* ── Layout ─────────────────────────────────────────────────── */
+      .wrap {
+        max-width: 768px;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 1.5rem;
+      }
+      @media (min-width: 640px) {
+        .wrap { padding: 2.5rem 1.5rem; }
+      }
 
-        .dice-area {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 15px;
-            width: 100%;
-        }
+      header { text-align: center; margin-bottom: 1.5rem; }
+      @media (min-width: 640px) { header { margin-bottom: 2.5rem; } }
 
-        .die {
-            width: 60px;
-            height: 60px;
-            background: var(--card-bg);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            border: 2px solid var(--hint-color);
-            color: var(--text-color);
-            transition: transform 0.1s;
-        }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.6);
+        backdrop-filter: blur(8px);
+        border-radius: 999px;
+        padding: 0.25rem 0.75rem;
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      @media (min-width: 640px) {
+        .eyebrow { padding: 0.375rem 1rem; font-size: 12px; }
+      }
+      .eyebrow-dot {
+        width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+      }
 
-        /* Анимация тряски */
-        .shaking {
-            animation: shake 0.5s infinite;
-        }
+      h1 {
+        font-family: "Cormorant Garamond", "Georgia", serif;
+        font-weight: 500;
+        font-size: 2.5rem;
+        margin: 0.5rem 0 0.5rem;
+        line-height: 1.1;
+      }
+      @media (min-width: 640px) { h1 { font-size: 3.75rem; } }
 
-        @keyframes shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
-        }
+      .subtitle {
+        color: var(--ink-soft);
+        font-size: 12px;
+        max-width: 28rem;
+        margin: 0.5rem auto 0;
+        line-height: 1.5;
+      }
+      @media (min-width: 640px) { .subtitle { font-size: 14px; } }
 
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            width: 100%;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
+      /* ── Dice field ─────────────────────────────────────────────── */
+      .field {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 180px;
+        padding: 2rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 1.5rem;
+        background: rgba(255,255,255,0.7);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 16px 48px -24px rgba(91,75,176,0.3);
+        overflow: hidden;
+      }
+      @media (min-width: 640px) {
+        .field { min-height: 260px; padding: 2.5rem 1.5rem; border-radius: 1.75rem; }
+      }
+      .field::before, .field::after {
+        content: ""; position: absolute; pointer-events: none; border-radius: 50%;
+        filter: blur(40px);
+      }
+      .field::before {
+        left: 1rem; top: 1rem; width: 4rem; height: 4rem;
+        background: rgba(124, 106, 209, 0.05);
+      }
+      .field::after {
+        right: 1.5rem; bottom: 1rem; width: 5rem; height: 5rem;
+        background: rgba(210, 170, 120, 0.1);
+      }
+      @media (min-width: 640px) {
+        .field::before { width: 6rem; height: 6rem; }
+        .field::after { width: 8rem; height: 8rem; }
+      }
 
-        .btn {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s, transform 0.1s;
-            flex: 1;
-            max-width: 150px;
-        }
+      .sum-badge {
+        position: absolute; right: 0.75rem; top: 0.75rem;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.8);
+        backdrop-filter: blur(8px);
+        border-radius: 999px;
+        padding: 0.25rem 0.625rem;
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      @media (min-width: 640px) {
+        .sum-badge { right: 1.25rem; top: 1.25rem; padding: 0.25rem 0.75rem; font-size: 12px; }
+      }
+      .sum-badge b { color: var(--ink); font-weight: 600; }
 
-        .btn:active {
-            transform: scale(0.96);
-        }
+      .dice-grid {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+      }
+      @media (min-width: 640px) { .dice-grid { gap: 2.5rem; } }
 
-        .btn-primary {
-            background-color: var(--button-color);
-            color: var(--button-text-color);
-        }
+      /* ── 3D Cube ─────────────────────────────────────────────────── */
+      .die {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .die-scene { perspective: 500px; }
+      .die-preserve-3d { transform-style: preserve-3d; }
 
-        .btn-secondary {
-            background-color: var(--secondary-bg);
-            color: var(--text-color);
-            border: 1px solid var(--hint-color);
-        }
+      .cube { transform-style: preserve-3d; position: relative; }
+      .cube-face {
+        position: absolute; inset: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        padding: 16%;
+        backface-visibility: hidden;
+        border-radius: 16%;
+        border: 1.5px solid #ddd5c4;
+      }
+      .cube-face--top    { background: linear-gradient(135deg, #fffdf7, #f5f0e6); }
+      .cube-face--front  { background: linear-gradient(135deg, #f8f3e9, #f0eadc); }
+      .cube-face--back   { background: linear-gradient(135deg, #eee8da, #e6dfd1); }
+      .cube-face--right  { background: linear-gradient(135deg, #f2ece0, #ebe4d6); }
+      .cube-face--left   { background: linear-gradient(135deg, #f0eadc, #e9e2d4); }
+      .cube-face--bottom { background: linear-gradient(135deg, #eae4d6, #e2dbc9); }
+      .cube-face::before {
+        content: ""; position: absolute; inset: 0; border-radius: inherit;
+        box-shadow:
+          inset 0 1px 2px rgba(255,255,255,0.5),
+          inset 0 -1px 2px rgba(0,0,0,0.04);
+        pointer-events: none;
+      }
+      .cube-face--front  { transform: translateZ(calc(var(--hs))); }
+      .cube-face--back   { transform: rotateY(180deg) translateZ(calc(var(--hs))); }
+      .cube-face--right  { transform: rotateY(90deg)  translateZ(calc(var(--hs))); }
+      .cube-face--left   { transform: rotateY(-90deg) translateZ(calc(var(--hs))); }
+      .cube-face--top    { transform: rotateX(-90deg) translateZ(calc(var(--hs))); }
+      .cube-face--bottom { transform: rotateX(90deg)  translateZ(calc(var(--hs))); }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+      .cube-dot { display: flex; align-items: center; justify-content: center; }
+      .cube-dot.active::after {
+        content: ""; display: block;
+        width: 78%; height: 78%;
+        border-radius: 50%;
+        background: radial-gradient(circle at 40% 38%, #443f5c, #2d2a44);
+        box-shadow:
+          0 1px 2px rgba(0,0,0,0.25),
+          inset 0 1px 1px rgba(255,255,255,0.15);
+      }
 
-        .history {
-            width: 100%;
-            max-width: 400px;
-            padding: 15px;
-            background: var(--secondary-bg);
-            border-radius: 16px;
-            margin-top: auto; /* Прижать к низу, если есть место */
-        }
+      /* Flat face for snapshots */
+      .flat-face {
+        background: linear-gradient(135deg, #fffdf7, #f5f0e6);
+        border: 1.5px solid #ddd5c4;
+        border-radius: 16%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        padding: 16%;
+        box-shadow:
+          inset 0 1px 2px rgba(255,255,255,0.5),
+          inset 0 -1px 2px rgba(0,0,0,0.04),
+          0 10px 18px rgba(79,70,229,0.15);
+        transform-style: flat;
+      }
 
-        .history h3 {
-            margin: 0 0 10px 0;
-            font-size: 16px;
-            color: var(--hint-color);
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+      .ground-shadow {
+        border-radius: 50%;
+        background: radial-gradient(ellipse, rgba(45,42,68,0.18) 0%, transparent 70%);
+      }
 
-        .history-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            max-height: 150px;
-            overflow-y: auto;
-        }
+      /* ── Animations ──────────────────────────────────────────────── */
+      @keyframes diceThrow {
+        0%   { transform: translate3d(0,0,0) scale(1); }
+        3%   { transform: translate3d(calc(var(--dir,1)*-3px), 3px, 0) scale(0.96); }
+        7%   { transform: translate3d(calc(var(--dir,1)*6px), -50px, 0) scale(1.06); }
+        11%  { transform: translate3d(calc(var(--dir,1)*11px), -80px, 0) scale(1.1); }
+        15%  { transform: translate3d(calc(var(--dir,1)*14px), -62px, 0) scale(1.07); }
+        19%  { transform: translate3d(calc(var(--dir,1)*14px), -18px, 0) scale(1.02); }
+        22%  { transform: translate3d(calc(var(--dir,1)*14px), 4px, 0) scale(0.96); }
+        26%  { transform: translate3d(calc(var(--dir,1)*12px), -38px, 0) scale(1.05); }
+        30%  { transform: translate3d(calc(var(--dir,1)*9px), -24px, 0) scale(1.02); }
+        34%  { transform: translate3d(calc(var(--dir,1)*6px), -6px, 0) scale(1); }
+        37%  { transform: translate3d(calc(var(--dir,1)*5px), 4px, 0) scale(0.98); }
+        40%  { transform: translate3d(calc(var(--dir,1)*3px), -18px, 0) scale(1.02); }
+        44%  { transform: translate3d(calc(var(--dir,1)*1px), -20px, 0) scale(1.03); }
+        48%  { transform: translate3d(calc(var(--dir,1)*-1px), -6px, 0) scale(1); }
+        51%  { transform: translate3d(calc(var(--dir,1)*-2px), 3px, 0) scale(0.99); }
+        55%  { transform: translate3d(calc(var(--dir,1)*-2px), -10px, 0) scale(1.01); }
+        59%  { transform: translate3d(calc(var(--dir,1)*-1px), -4px, 0) scale(1); }
+        63%  { transform: translate3d(0, 2px, 0) scale(1); }
+        67%  { transform: translate3d(0, -3px, 0) scale(1); }
+        70%  { transform: translate3d(0, -1px, 0) scale(1); }
+        75%  { transform: translate3d(0, 1px, 0) scale(1); }
+        80%  { transform: translate3d(0, 0, 0) scale(1); }
+        100% { transform: translate3d(0, 0, 0) scale(1); }
+      }
 
-        .history-item {
-            padding: 10px;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 14px;
-        }
-        
-        .history-item:last-child {
-            border-bottom: none;
-        }
+      @keyframes diceSpin {
+        0%   { transform: rotateX(0) rotateY(0) rotateZ(0); }
+        10%  { transform: rotateX(-520deg) rotateY(360deg) rotateZ(-220deg); }
+        20%  { transform: rotateX(-1080deg) rotateY(760deg) rotateZ(-460deg); }
+        30%  { transform: rotateX(-1540deg) rotateY(1100deg) rotateZ(-680deg); }
+        40%  { transform: rotateX(-1910deg) rotateY(1380deg) rotateZ(-860deg); }
+        50%  { transform: rotateX(-2190deg) rotateY(1560deg) rotateZ(-980deg); }
+        60%  { transform: rotateX(-2370deg) rotateY(1680deg) rotateZ(-1040deg); }
+        70%  { transform: rotateX(-2460deg) rotateY(1740deg) rotateZ(-1066deg); }
+        80%  { transform: rotateX(-2500deg) rotateY(1780deg) rotateZ(-1078deg); }
+        90%  { transform: rotateX(-2515deg) rotateY(1795deg) rotateZ(-1079deg); }
+        100% { transform: rotateX(-2520deg) rotateY(1800deg) rotateZ(-1080deg); }
+      }
 
-        .history-values {
-            color: var(--hint-color);
-            font-size: 12px;
-        }
-        
-        .history-sum {
-            font-weight: bold;
-            font-size: 16px;
-        }
+      @keyframes diceOrient {
+        0%, 84% { transform: rotateX(0) rotateY(0); }
+        100%    { transform: rotateX(var(--frx)) rotateY(var(--fry)); }
+      }
 
-        /* Стили для пустой истории */
-        .empty-history {
-            text-align: center;
-            color: var(--hint-color);
-            padding: 10px;
-            font-style: italic;
+      @keyframes diceShadow {
+        0%   { transform: scale(1);    opacity: 0.5; }
+        3%   { transform: scale(0.98); opacity: 0.48; }
+        7%   { transform: scale(0.5);  opacity: 0.15; }
+        11%  { transform: scale(0.35); opacity: 0.1; }
+        15%  { transform: scale(0.45); opacity: 0.14; }
+        19%  { transform: scale(0.6);  opacity: 0.28; }
+        22%  { transform: scale(0.92); opacity: 0.48; }
+        26%  { transform: scale(0.5);  opacity: 0.16; }
+        30%  { transform: scale(0.6);  opacity: 0.24; }
+        34%  { transform: scale(0.78); opacity: 0.36; }
+        37%  { transform: scale(0.9);  opacity: 0.44; }
+        40%  { transform: scale(0.68); opacity: 0.28; }
+        44%  { transform: scale(0.58); opacity: 0.2; }
+        48%  { transform: scale(0.8);  opacity: 0.36; }
+        51%  { transform: scale(0.88); opacity: 0.42; }
+        55%  { transform: scale(0.78); opacity: 0.36; }
+        59%  { transform: scale(0.85); opacity: 0.4; }
+        63%  { transform: scale(0.92); opacity: 0.44; }
+        67%  { transform: scale(0.9);  opacity: 0.44; }
+        70%  { transform: scale(0.92); opacity: 0.45; }
+        75%  { transform: scale(0.96); opacity: 0.47; }
+        80%  { transform: scale(1);    opacity: 0.5; }
+        100% { transform: scale(1);    opacity: 0.5; }
+      }
+
+      .anim-throw  { animation: diceThrow  3s linear both; will-change: transform; }
+      .anim-spin   { animation: diceSpin   3s linear both; will-change: transform; }
+      .anim-orient { animation: diceOrient 3s cubic-bezier(0.55,0,1,1) both; will-change: transform; }
+      .anim-shadow { animation: diceShadow 3s linear both; will-change: transform, opacity; }
+
+      /* ── Controls ───────────────────────────────────────────────── */
+      .panel {
+        margin-top: 1rem;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.7);
+        backdrop-filter: blur(8px);
+        border-radius: 1.25rem;
+        padding: 1rem;
+      }
+      @media (min-width: 640px) {
+        .panel { margin-top: 1.5rem; border-radius: 1.75rem; padding: 1.25rem; }
+      }
+
+      .row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 0.75rem; margin-bottom: 1rem;
+      }
+      @media (min-width: 640px) { .row { margin-bottom: 1.25rem; } }
+
+      .label {
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      @media (min-width: 640px) { .label { font-size: 14px; } }
+
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        background: rgba(243,237,225,0.6);
+        border-radius: 999px;
+        padding: 0.125rem;
+      }
+      @media (min-width: 640px) { .seg { padding: 0.25rem; } }
+
+      .seg button {
+        min-width: 40px;
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--ink-soft);
+        transition: all 0.2s;
+      }
+      @media (min-width: 640px) { .seg button { min-width: 44px; padding: 0.5rem 1.25rem; } }
+      .seg button:hover:not(:disabled) { color: var(--ink); }
+      .seg button.active {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(124, 106, 209, 0.3);
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
+      @media (min-width: 640px) { .actions { gap: 0.75rem; } }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.875rem 1rem;
+        border-radius: 0.75rem;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+      @media (min-width: 640px) {
+        .btn { padding: 1rem 1.5rem; border-radius: 1rem; font-size: 16px; }
+      }
+      .btn svg { width: 20px; height: 20px; }
+
+      .btn-primary {
+        background: var(--accent-deep);
+        color: #fff;
+        box-shadow: 0 8px 24px -8px rgba(91, 75, 176, 0.5);
+      }
+      .btn-primary:hover:not(:disabled) {
+        box-shadow: 0 12px 32px -8px rgba(91, 75, 176, 0.65);
+      }
+      .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+      .btn-primary.rolling { opacity: 0.8; }
+
+      .btn-ghost {
+        background: #fff;
+        color: var(--ink);
+        border: 1px solid var(--border);
+      }
+      .btn-ghost:hover:not(:disabled) {
+        border-color: rgba(124, 106, 209, 0.4);
+        color: var(--accent-deep);
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .spin-icon { animation: spin 0.8s linear infinite; }
+      .hover-rotate { transition: transform 0.3s; }
+      .btn-primary:hover:not(:disabled) .hover-rotate { transform: rotate(45deg); }
+
+      /* ── History ─────────────────────────────────────────────────── */
+      .history {
+        margin-top: 1rem;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.7);
+        backdrop-filter: blur(8px);
+        border-radius: 1.25rem;
+        overflow: hidden;
+      }
+      @media (min-width: 640px) { .history { margin-top: 1.5rem; border-radius: 1.75rem; } }
+
+      .history-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border);
+      }
+      @media (min-width: 640px) { .history-head { padding: 1rem 1.5rem; } }
+
+      .history-title {
+        font-family: "Cormorant Garamond", Georgia, serif;
+        font-weight: 500;
+        font-size: 1.25rem;
+        margin: 0;
+      }
+      @media (min-width: 640px) { .history-title { font-size: 1.5rem; } }
+      .history-sub {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      @media (min-width: 640px) { .history-sub { font-size: 12px; } }
+
+      .history-clear {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        transition: color 0.2s;
+      }
+      @media (min-width: 640px) { .history-clear { font-size: 12px; } }
+      .history-clear:hover { color: var(--accent-deep); }
+
+      .history-body {
+        padding: 0.5rem 0.75rem;
+        max-height: 360px;
+        overflow-y: auto;
+      }
+      @media (min-width: 640px) { .history-body { padding: 0.75rem 1rem; } }
+      .history-body::-webkit-scrollbar { width: 4px; }
+      .history-body::-webkit-scrollbar-thumb {
+        background: var(--border); border-radius: 999px;
+      }
+
+      .history-empty {
+        padding: 2.5rem 1rem;
+        text-align: center;
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+      .history-empty-icon { font-size: 1.875rem; opacity: 0.4; margin-bottom: 0.75rem; }
+      @media (min-width: 640px) {
+        .history-empty { padding: 3rem 1.5rem; font-size: 14px; }
+        .history-empty-icon { font-size: 2.5rem; }
+      }
+
+      .hrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.625rem 0.75rem;
+        border-radius: 0.75rem;
+        background: rgba(243,237,225,0.4);
+        margin-bottom: 0.375rem;
+      }
+      @media (min-width: 640px) {
+        .hrow {
+          padding: 0.75rem 1rem;
+          border-radius: 1rem;
+          margin-bottom: 0.5rem;
         }
+      }
+      .hrow-left { display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1; }
+      @media (min-width: 640px) { .hrow-left { gap: 0.75rem; } }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 0.375rem;
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 0.375rem;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      @media (min-width: 640px) {
+        .chip { min-width: 32px; height: 32px; padding: 0 0.5rem; font-size: 14px; border-radius: 0.5rem; }
+      }
+      .chip-row { display: flex; gap: 0.25rem; flex-shrink: 0; }
+      @media (min-width: 640px) { .chip-row { gap: 0.375rem; } }
+
+      .hrow-meta {
+        font-size: 10px; color: var(--ink-soft);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      @media (min-width: 640px) { .hrow-meta { font-size: 12px; } }
+
+      .hrow-sum {
+        flex-shrink: 0;
+        background: rgba(124, 106, 209, 0.1);
+        color: var(--accent-deep);
+        border-radius: 999px;
+        padding: 0.125rem 0.625rem;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      @media (min-width: 640px) {
+        .hrow-sum { padding: 0.25rem 0.75rem; font-size: 14px; }
+      }
+
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .fade-in-up { animation: fadeInUp 0.35s ease-out both; }
+
+      footer {
+        margin-top: 1.5rem;
+        text-align: center;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(107, 102, 128, 0.7);
+      }
+      @media (min-width: 640px) { footer { margin-top: 2.5rem; font-size: 12px; } }
+
+      /* Toast */
+      .toast {
+        position: fixed;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 50;
+        pointer-events: none;
+      }
+      @media (min-width: 640px) { .toast { bottom: 1.5rem; } }
+      .toast-box {
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.5rem 1rem;
+        font-size: 12px;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+        animation: toastIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+      }
+      @media (min-width: 640px) {
+        .toast-box { padding: 0.625rem 1.25rem; font-size: 14px; }
+      }
+      @keyframes toastIn {
+        from { opacity: 0; transform: translate(-50%, 16px) scale(0.92); }
+        to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      }
+      .toast-box { transform: none; }
+
+      /* Hide meta on very small screens */
+      @media (max-width: 639px) {
+        .hrow-meta { display: none; }
+      }
+
+      @media (max-width: 360px) {
+        .dice-grid { gap: 0.75rem !important; }
+      }
+      @media (max-height: 500px) and (orientation: landscape) {
+        .field { min-height: 140px !important; padding: 0.75rem 1rem !important; }
+      }
     </style>
-</head>
-<body>
-
-    <h1>🎲 Кубики Судьбы</h1>
-
-    <div class="controls">
-        <label for="diceCount">Количество:</label>
-        <input type="number" id="diceCount" value="1" min="1" max="10">
-    </div>
-
-    <!-- Область, которая пойдет на скриншот -->
-    <div id="captureArea">
-        <div class="total-sum" id="totalSum">0</div>
-        <div class="dice-area" id="diceArea">
-            <!-- Кубики -->
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="eyebrow">
+          <span class="eyebrow-dot"></span>
+          оракул случая
         </div>
+        <h1 class="font-display">Бросок костей</h1>
+        <p class="subtitle">
+          Позвольте числам говорить. Выберите количество кубиков и сделайте бросок.
+        </p>
+      </header>
+
+      <section>
+        <div class="field" id="field">
+          <div class="dice-grid" id="diceGrid"></div>
+          <div class="sum-badge">Σ <b id="sumBadge">0</b></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <div class="label">Кубиков</div>
+          <div class="seg" id="seg">
+            <button data-count="1" class="active">1</button>
+            <button data-count="2">2</button>
+            <button data-count="3">3</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btnRoll">
+            <svg id="rollIcon" class="hover-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+              <circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"></circle>
+              <circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"></circle>
+              <circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"></circle>
+              <circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"></circle>
+            </svg>
+            <span id="btnRollText">Бросить</span>
+          </button>
+          <button class="btn btn-ghost" id="btnSnapshot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <span id="btnSnapshotText">Снимок</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="history">
+        <div class="history-head">
+          <div>
+            <h2 class="history-title">История бросков</h2>
+            <p class="history-sub" id="historySub">пока пусто</p>
+          </div>
+          <button class="history-clear" id="btnClear" style="display:none">Очистить</button>
+        </div>
+        <div class="history-body" id="historyBody">
+          <div class="history-empty" id="historyEmpty">
+            <div class="history-empty-icon">🎲</div>
+            Сделайте первый бросок — и здесь появятся записи
+          </div>
+        </div>
+      </section>
+
+      <footer>© <span id="year">2026</span> · light layout</footer>
     </div>
 
-    <div class="btn-group">
-        <button id="rollBtn" class="btn btn-primary">Бросить</button>
-        <button id="screenshotBtn" class="btn btn-secondary">📸 Снимок</button>
-    </div>
-    
-    <div class="btn-group">
-         <button id="clearBtn" class="btn btn-secondary" style="max-width: 100%;">Очистить историю</button>
-    </div>
-
-    <div class="history">
-        <h3>История бросков</h3>
-        <ul class="history-list" id="historyList">
-            <li class="empty-history">Пока пусто</li>
-        </ul>
+    <div class="toast" id="toast" style="display:none">
+      <div class="toast-box" id="toastBox"></div>
     </div>
 
     <script>
-        // --- Инициализация Telegram WebApp ---
-        const tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрыть на весь экран
+      // ── Telegram SDK Integration ──────────────────────────────────
+      const tg = (window.Telegram && window.Telegram.WebApp) || null;
+      
+      if (tg) {
+        try {
+          tg.ready();
+          tg.expand();
+          // Устанавливаем цвета под тему, но сохраняем твою эстетику
+          // Если хочешь жестко твои цвета, можно закомментировать setHeaderColor
+          tg.setHeaderColor("#faf6ef"); 
+          tg.setBackgroundColor("#faf6ef");
+        } catch (e) {}
+      }
 
-        // Применение цветов темы Telegram
-        function applyTheme() {
-            const theme = tg.themeParams;
-            const root = document.documentElement;
-            
-            if (theme.bg_color) root.style.setProperty('--bg-color', theme.bg_color);
-            if (theme.text_color) root.style.setProperty('--text-color', theme.text_color);
-            if (theme.button_color) root.style.setProperty('--button-color', theme.button_color);
-            if (theme.button_text_color) root.style.setProperty('--button-text-color', theme.button_text_color);
-            if (theme.secondary_bg_color) root.style.setProperty('--secondary-bg', theme.secondary_bg_color);
-            if (theme.hint_color) root.style.setProperty('--hint-color', theme.hint_color);
-            
-            // Фоллбек для карточек, если secondary_bg нет
-            if (!theme.secondary_bg_color && theme.bg_color) {
-                // Немного затемняем/осветляем основной фон для контраста
-                root.style.setProperty('--secondary-bg', theme.bg_color); 
-            }
+      // Helper for Haptic Feedback
+      const haptic = (style) => { 
+        try { 
+          if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style); 
+        } catch (e) {} 
+      };
+      const hapticOk = () => { 
+        try { 
+          if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success"); 
+        } catch (e) {} 
+      };
+      
+      // Отправка данных боту (опционально, если нужно передавать результат)
+      const sendResult = (values) => {
+        try {
+          if (tg) tg.sendData(JSON.stringify({ action: "roll", values }));
+        } catch (e) {}
+      };
+
+      // ── State ─────────────────────────────────────────────────────
+      const state = {
+        count: 1,
+        dice: [3],
+        rolling: false,
+        snapshotting: false,
+        snapshotBusy: false,
+        history: [],
+        counter: 0,
+      };
+      const ROLL_DURATION = 3000;
+
+      // Face → rotation to bring it to the viewer
+      const FACE_TO_FRONT = {
+        1: { rx: 0, ry: 0 },
+        2: { rx: 0, ry: -90 },
+        3: { rx: 90, ry: 0 },
+        4: { rx: -90, ry: 0 },
+        5: { rx: 0, ry: 90 },
+        6: { rx: 0, ry: 180 },
+      };
+      const FACES = [
+        { cls: "front",  n: 1 },
+        { cls: "back",   n: 6 },
+        { cls: "right",  n: 2 },
+        { cls: "left",   n: 5 },
+        { cls: "top",    n: 3 },
+        { cls: "bottom", n: 4 },
+      ];
+      const DOT_MAP = {
+        1: [4],
+        2: [2, 6],
+        3: [2, 4, 6],
+        4: [0, 2, 6, 8],
+        5: [0, 2, 4, 6, 8],
+        6: [0, 2, 3, 5, 6, 8],
+      };
+
+      // ── DOM refs ──────────────────────────────────────────────────
+      const $ = (id) => document.getElementById(id);
+      const fieldEl = $("field");
+      const gridEl = $("diceGrid");
+      const sumBadge = $("sumBadge");
+      const segEl = $("seg");
+      const btnRoll = $("btnRoll");
+      const btnRollText = $("btnRollText");
+      const rollIcon = $("rollIcon");
+      const btnSnapshot = $("btnSnapshot");
+      const btnSnapshotText = $("btnSnapshotText");
+      const historyBody = $("historyBody");
+      const historyEmpty = $("historyEmpty");
+      const historySub = $("historySub");
+      const btnClear = $("btnClear");
+      const toastEl = $("toast");
+      const toastBox = $("toastBox");
+
+      $("year").textContent = new Date().getFullYear();
+
+      // ── Rendering helpers ─────────────────────────────────────────
+      function dieSize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        if (h < 500) return Math.min(72, Math.floor((h - 120) / state.count));
+        if (w < 380) return Math.floor(Math.min((w - 80) / state.count, 85));
+        if (w < 640) return Math.floor(Math.min((w - 100) / state.count, 100));
+        return 110;
+      }
+
+      function faceDotsHTML(n) {
+        const active = DOT_MAP[n] || DOT_MAP[1];
+        let out = "";
+        for (let i = 0; i < 9; i++) {
+          out += `<div class="cube-dot ${active.includes(i) ? "active" : ""}"></div>`;
         }
-        applyTheme();
+        return out;
+      }
 
-        // Элементы DOM
-        const diceArea = document.getElementById('diceArea');
-        const totalSumEl = document.getElementById('totalSum');
-        const diceCountInput = document.getElementById('diceCount');
-        const rollBtn = document.getElementById('rollBtn');
-        const screenshotBtn = document.getElementById('screenshotBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const historyList = document.getElementById('historyList');
-        const captureArea = document.getElementById('captureArea');
-
-        let isRolling = false;
-
-        // --- Логика Кубиков ---
-
-        function createDieElement(value = '?') {
-            const die = document.createElement('div');
-            die.className = 'die';
-            die.textContent = value;
-            return die;
-        }
-
-        function updateDiceDisplay(count) {
-            diceArea.innerHTML = '';
-            for (let i = 0; i < count; i++) {
-                diceArea.appendChild(createDieElement());
-            }
-            totalSumEl.textContent = '0';
-        }
-
-        function addToHistory(sum, values) {
-            // Удаляем заглушку "пусто", если она есть
-            const emptyMsg = historyList.querySelector('.empty-history');
-            if (emptyMsg) emptyMsg.remove();
-
-            const item = document.createElement('li');
-            item.className = 'history-item';
-            
-            // Формируем строку значений (например: 1, 4, 6)
-            const valuesStr = values.join(', ');
-            
-            item.innerHTML = `
-                <span class="history-values">[${valuesStr}]</span>
-                <span class="history-sum">${sum}</span>
-            `;
-            
-            historyList.prepend(item);
-        }
-
-        function rollDice() {
-            if (isRolling) return;
-            isRolling = true;
-
-            // Вибрация начала действия
-            tg.HapticFeedback.impactOccurred('medium');
-
-            // Блокируем кнопки
-            rollBtn.disabled = true;
-            screenshotBtn.disabled = true;
-            diceCountInput.disabled = true;
-
-            const count = parseInt(diceCountInput.value) || 1;
-            
-            // Очищаем поле и создаем "трясущиеся" кубики
-            diceArea.innerHTML = '';
-            const diceElements = [];
-            for (let i = 0; i < count; i++) {
-                const die = createDieElement('?');
-                die.classList.add('shaking');
-                diceArea.appendChild(die);
-                diceElements.push(die);
-            }
-            totalSumEl.textContent = '...';
-
-            // Задержка для анимации (600мс)
-            setTimeout(() => {
-                let sum = 0;
-                const values = [];
-
-                diceElements.forEach(die => {
-                    const val = Math.floor(Math.random() * 6) + 1;
-                    die.textContent = val;
-                    die.classList.remove('shaking');
-                    sum += val;
-                    values.push(val);
-                });
-
-                totalSumEl.textContent = sum;
-                addToHistory(sum, values);
-
-                // Вибрация успеха
-                tg.HapticFeedback.notificationOccurred('success');
-
-                // Разблокировка
-                isRolling = false;
-                rollBtn.disabled = false;
-                screenshotBtn.disabled = false;
-                diceCountInput.disabled = false;
-
-            }, 600);
+      function dieHTML(value, idx, size, rolling, flat) {
+        if (flat) {
+          return `
+            <div class="die" style="width:${size}px">
+              <div class="flat-face" style="width:${size}px;height:${size}px">
+                ${faceDotsHTML(value)}
+              </div>
+              <div class="ground-shadow" style="width:${size*0.55}px;height:${size*0.07}px;margin-top:${size*0.08}px"></div>
+            </div>`;
         }
 
-        // --- Логика Скриншота ---
+        const { rx, ry } = FACE_TO_FRONT[value] || FACE_TO_FRONT[1];
+        const hs = size / 2;
+        const dir = idx % 2 === 0 ? 1 : -1;
+        const delay = idx * 200;
+        const cubeStyle = rolling
+          ? `width:${size}px;height:${size}px;transform:rotateX(0deg) rotateY(0deg)`
+          : `width:${size}px;height:${size}px;transform:rotateX(${rx}deg) rotateY(${ry}deg)`;
 
-        async function takeScreenshot() {
-            if (isRolling) return;
-            
-            // Вибрация
-            tg.HapticFeedback.impactOccurred('light');
-            screenshotBtn.disabled = true;
-            screenshotBtn.textContent = '⏳ Обработка...';
-
-            try {
-                // Ждем немного, чтобы UI обновился
-                await new Promise(r => setTimeout(r, 100));
-
-                // Генерируем canvas
-                const canvas = await html2canvas(captureArea, {
-                    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--secondary-bg').trim(),
-                    scale: 2 // Для лучшего качества
-                });
-
-                // Конвертируем в blob/url
-                const imageUri = canvas.toDataURL('image/png');
-
-                // Создаем временную ссылку для скачивания
-                const link = document.createElement('a');
-                link.download = `kubiki-${Date.now()}.png`;
-                link.href = imageUri;
-                
-                // Кликаем программно
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                // Уведомление об успехе
-                tg.showAlert("📸 Снимок сохранен в загрузки устройства!");
-                tg.HapticFeedback.notificationOccurred('success');
-
-            } catch (err) {
-                console.error(err);
-                tg.showAlert("❌ Ошибка создания снимка. Попробуйте снова.");
-                tg.HapticFeedback.notificationOccurred('error');
-            } finally {
-                screenshotBtn.disabled = false;
-                screenshotBtn.textContent = '📸 Снимок';
-            }
+        let facesHTML = "";
+        for (const { cls, n } of FACES) {
+          facesHTML += `<div class="cube-face cube-face--${cls}" style="--hs:${hs}px">${faceDotsHTML(n)}</div>`;
         }
 
-        // --- Обработчики событий ---
+        return `
+          <div class="die" style="width:${size}px">
+            <div class="die-scene" style="width:${size}px;height:${size}px">
+              <div class="die-preserve-3d ${rolling ? "anim-throw" : ""}"
+                   style="${rolling ? `--dir:${dir};animation-delay:${delay}ms;` : ""}width:${size}px;height:${size}px">
+                <div class="die-preserve-3d ${rolling ? "anim-spin" : ""}"
+                     style="${rolling ? `animation-delay:${delay}ms;` : ""}">
+                  <div class="die-preserve-3d ${rolling ? "anim-orient" : ""}"
+                       style="${rolling ? `animation-delay:${delay}ms;` : ""}width:${size}px;height:${size}px;--frx:${rx}deg;--fry:${ry}deg">
+                    <div class="cube" style="${cubeStyle}">
+                      ${facesHTML}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="ground-shadow ${rolling ? "anim-shadow" : ""}"
+                 style="width:${size*0.55}px;height:${size*0.07}px;margin-top:${-size*0.03}px;${rolling ? `animation-delay:${delay}ms;` : ""}"></div>
+          </div>`;
+      }
 
-        rollBtn.addEventListener('click', rollDice);
+      function renderDice() {
+        const size = dieSize();
+        gridEl.innerHTML = state.dice
+          .map((v, i) => dieHTML(v, i, size, state.rolling, state.snapshotting))
+          .join("");
+        sumBadge.textContent = state.dice.reduce((a, b) => a + b, 0);
+      }
+
+      function renderSeg() {
+        segEl.querySelectorAll("button").forEach((b) => {
+          const n = parseInt(b.dataset.count, 10);
+          b.classList.toggle("active", n === state.count);
+        });
+      }
+
+      function plural(n) {
+        if (n === 1) return "бросок";
+        if (n >= 2 && n <= 4) return "броска";
+        return "бросков";
+      }
+
+      function renderHistory() {
+        if (state.history.length === 0) {
+          historyEmpty.style.display = "";
+          historyBody.querySelectorAll(".hrow").forEach((e) => e.remove());
+          historySub.textContent = "пока пусто";
+          btnClear.style.display = "none";
+          return;
+        }
+        historyEmpty.style.display = "none";
+        btnClear.style.display = "";
+        historySub.textContent = `${state.history.length} ${plural(state.history.length)}`;
+
+        const existing = historyBody.querySelectorAll(".hrow");
+        existing.forEach((e) => e.remove());
+
+        for (const item of state.history) {
+          const row = document.createElement("div");
+          row.className = "hrow fade-in-up";
+          row.innerHTML = `
+            <div class="hrow-left">
+              <div class="chip-row">
+                ${item.values.map((v) => `<span class="chip">${v}</span>`).join("")}
+              </div>
+              <span class="hrow-meta">#${item.id} · ${item.timestamp}</span>
+            </div>
+            <div class="hrow-sum">Σ ${item.total}</div>`;
+          historyBody.appendChild(row);
+        }
+      }
+
+      // ── Actions ───────────────────────────────────────────────────
+      function roll() {
+        if (state.rolling) return;
+        const finalValues = Array.from(
+          { length: state.count },
+          () => 1 + Math.floor(Math.random() * 6)
+        );
+        state.dice = finalValues;
+        state.rolling = true;
+        btnRoll.disabled = true;
+        btnRoll.classList.add("rolling");
+        btnSnapshot.disabled = true;
+        btnRollText.textContent = "Летят…";
+        rollIcon.classList.add("spin-icon");
+        rollIcon.classList.remove("hover-rotate");
         
-        // Кнопка Telegram MainButton
-        tg.MainButton.setText("БРОСИТЬ КУБИКИ");
-        tg.MainButton.show();
-        tg.MainButton.onClick(rollDice);
+        // Haptic feedback on roll start
+        haptic("medium");
 
-        screenshotBtn.addEventListener('click', takeScreenshot);
+        renderDice();
 
-        clearBtn.addEventListener('click', () => {
-            historyList.innerHTML = '<li class="empty-history">Пока пусто</li>';
-            totalSumEl.textContent = '0';
-            diceArea.innerHTML = '';
-            updateDiceDisplay(parseInt(diceCountInput.value) || 1);
-            tg.HapticFeedback.selectionChanged();
+        window.setTimeout(() => {
+          state.rolling = false;
+          btnRoll.disabled = false;
+          btnSnapshot.disabled = false;
+          btnRoll.classList.remove("rolling");
+          btnRollText.textContent = "Бросить";
+          rollIcon.classList.remove("spin-icon");
+          rollIcon.classList.add("hover-rotate");
+          
+          // Haptic feedback on roll end
+          hapticOk();
+          sendResult(finalValues);
+
+          const total = finalValues.reduce((a, b) => a + b, 0);
+          const now = new Date();
+          const ts = now.toLocaleTimeString("ru-RU", {
+            hour: "2-digit", minute: "2-digit", second: "2-digit",
+          });
+          state.counter += 1;
+          state.history.unshift({
+            id: state.counter,
+            timestamp: ts,
+            values: finalValues,
+            total,
+          });
+          if (state.history.length > 50) state.history.length = 50;
+
+          // Re-render dice so CSS animations reset cleanly.
+          renderDice();
+          renderHistory();
+        }, ROLL_DURATION);
+      }
+
+      function changeCount(n) {
+        if (state.rolling || n === state.count) return;
+        // Haptic feedback on selection
+        haptic("light");
+        
+        state.count = n;
+        if (state.dice.length < n) {
+          state.dice = [
+            ...state.dice,
+            ...Array.from({ length: n - state.dice.length }, () => 1 + Math.floor(Math.random() * 6)),
+          ];
+        } else if (state.dice.length > n) {
+          state.dice = state.dice.slice(0, n);
+        }
+        renderSeg();
+        renderDice();
+      }
+
+      function clearHistory() {
+        haptic("light");
+        state.history = [];
+        renderHistory();
+      }
+
+      function showToast(msg) {
+        toastBox.textContent = msg;
+        toastEl.style.display = "";
+        // restart animation
+        toastBox.style.animation = "none";
+        void toastBox.offsetWidth;
+        toastBox.style.animation = "";
+        window.setTimeout(() => { toastEl.style.display = "none"; }, 2200);
+      }
+
+      function canvasSnapshot() {
+        const size = dieSize();
+        const gap = 40;
+        const padding = 60;
+        const n = state.dice.length;
+        const W = padding * 2 + n * size + (n - 1) * gap;
+        const H = 260;
+        const DPR = 2;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = W * DPR;
+        canvas.height = H * DPR;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(DPR, DPR);
+
+        // Background
+        const grad = ctx.createLinearGradient(0, 0, W, H);
+        grad.addColorStop(0, "#faf6ef");
+        grad.addColorStop(1, "#faf6ef");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Soft blobs
+        const r1 = ctx.createRadialGradient(80, 40, 0, 80, 40, 80);
+        r1.addColorStop(0, "rgba(124,106,209,0.08)");
+        r1.addColorStop(1, "rgba(124,106,209,0)");
+        ctx.fillStyle = r1; ctx.fillRect(0, 0, W, H);
+        const r2 = ctx.createRadialGradient(W - 80, H - 40, 0, W - 80, H - 40, 100);
+        r2.addColorStop(0, "rgba(210,170,120,0.1)");
+        r2.addColorStop(1, "rgba(210,170,120,0)");
+        ctx.fillStyle = r2; ctx.fillRect(0, 0, W, H);
+
+        // Field card
+        ctx.save();
+        ctx.shadowColor = "rgba(91,75,176,0.15)";
+        ctx.shadowBlur = 40;
+        ctx.shadowOffsetY = 10;
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        roundRect(ctx, 20, 20, W - 40, H - 40, 24);
+        ctx.fill();
+        ctx.restore();
+
+        // Dice
+        const totalY = (H - size) / 2;
+        for (let i = 0; i < n; i++) {
+          const x = padding + i * (size + gap);
+          drawDieFace(ctx, x, totalY, size, state.dice[i]);
+        }
+
+        // Sum badge
+        const total = state.dice.reduce((a, b) => a + b, 0);
+        ctx.save();
+        ctx.font = "600 11px Inter, sans-serif";
+        ctx.fillStyle = "#6b6680";
+        const txt = "Σ " + total;
+        const tw = ctx.measureText(txt).width;
+        const bx = W - 40 - tw - 16;
+        const by = 36;
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        roundRect(ctx, bx, by, tw + 16, 22, 11);
+        ctx.fill();
+        ctx.strokeStyle = "#e8dfd1";
+        ctx.stroke();
+        ctx.fillStyle = "#6b6680";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Σ ", bx + 8, by + 11);
+        ctx.fillStyle = "#2d2a44";
+        ctx.font = "600 11px Inter, sans-serif";
+        ctx.fillText(total, bx + 8 + ctx.measureText("Σ ").width, by + 11);
+        ctx.restore();
+
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+          link.download = `dice-${stamp}.png`;
+          link.href = url;
+          link.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 500);
         });
+      }
 
-        diceCountInput.addEventListener('change', (e) => {
-            let val = parseInt(e.target.value);
-            if (val < 1) val = 1;
-            if (val > 10) val = 10;
-            e.target.value = val;
-            updateDiceDisplay(val);
-            tg.HapticFeedback.selectionChanged();
-        });
+      function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      }
 
-        // Старт
-        updateDiceDisplay(1);
-        tg.ready();
+      function drawDieFace(ctx, x, y, size, value) {
+        // Shadow
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(x + size / 2, y + size + size * 0.06, size * 0.275, size * 0.035, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(45,42,68,0.15)";
+        ctx.fill();
+        ctx.restore();
 
+        // Face rounded rect
+        ctx.save();
+        ctx.shadowColor = "rgba(79,70,229,0.15)";
+        ctx.shadowBlur = 18;
+        ctx.shadowOffsetY = 10;
+        const g = ctx.createLinearGradient(x, y, x + size, y + size);
+        g.addColorStop(0, "#fffdf7");
+        g.addColorStop(1, "#f5f0e6");
+        ctx.fillStyle = g;
+        ctx.strokeStyle = "#ddd5c4";
+        ctx.lineWidth = 1.5;
+        const r = size * 0.16;
+        roundRect(ctx, x, y, size, size, r);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // Dots
+        const pad = size * 0.16;
+        const inner = size - pad * 2;
+        const cell = inner / 3;
+        const active = DOT_MAP[value] || DOT_MAP[1];
+        const dotR = cell * 0.39;
+        for (let i = 0; i < 9; i++) {
+          if (!active.includes(i)) continue;
+          const row = Math.floor(i / 3);
+          const col = i % 3;
+          const cx = x + pad + cell * col + cell / 2;
+          const cy = y + pad + cell * row + cell / 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+          const dg = ctx.createRadialGradient(cx - dotR * 0.25, cy - dotR * 0.25, 0, cx, cy, dotR);
+          dg.addColorStop(0, "#443f5c");
+          dg.addColorStop(1, "#2d2a44");
+          ctx.fillStyle = dg;
+          ctx.fill();
+        }
+      }
+
+      async function takeSnapshot() {
+        if (state.snapshotBusy || state.rolling) return;
+        state.snapshotBusy = true;
+        // Haptic feedback on snapshot start
+        haptic("light");
+        
+        btnSnapshot.disabled = true;
+        btnSnapshotText.textContent = "Сохраняю…";
+        try {
+          // Switch to flat rendering (pure 2D top face) — matches what canvas draws.
+          // We also render to canvas directly, so this is for consistency if DOM is captured.
+          state.snapshotting = true;
+          renderDice();
+          await new Promise((r) => requestAnimationFrame(r));
+
+          canvasSnapshot();
+
+          showToast("Снимок сохранён ✨");
+          hapticOk();
+        } catch (e) {
+          console.error(e);
+          showToast("Не удалось сделать снимок");
+        } finally {
+          state.snapshotting = false;
+          state.snapshotBusy = false;
+          renderDice();
+          btnSnapshot.disabled = false;
+          btnSnapshotText.textContent = "Снимок";
+        }
+      }
+
+      // ── Events ────────────────────────────────────────────────────
+      segEl.querySelectorAll("button").forEach((b) => {
+        b.addEventListener("click", () => changeCount(parseInt(b.dataset.count, 10)));
+      });
+      btnRoll.addEventListener("click", roll);
+      btnSnapshot.addEventListener("click", takeSnapshot);
+      btnClear.addEventListener("click", clearHistory);
+      window.addEventListener("resize", () => { if (!state.rolling) renderDice(); });
+
+      // ── Initial render ────────────────────────────────────────────
+      renderSeg();
+      renderDice();
+      renderHistory();
     </script>
-</body>
+  </body>
 </html>
