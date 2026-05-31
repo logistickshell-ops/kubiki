@@ -705,7 +705,6 @@
         try {
           tg.ready();
           tg.expand();
-          // Устанавливаем цвета под тему, но сохраняем твою эстетику
           tg.setHeaderColor("#faf6ef"); 
           tg.setBackgroundColor("#faf6ef");
         } catch (e) {}
@@ -723,7 +722,6 @@
         } catch (e) {} 
       };
       
-      // Отправка данных боту (опционально, если нужно передавать результат)
       const sendResult = (values) => {
         try {
           if (tg) tg.sendData(JSON.stringify({ action: "roll", values }));
@@ -742,7 +740,6 @@
       };
       const ROLL_DURATION = 3000;
 
-      // Face → rotation to bring it to the viewer
       const FACE_TO_FRONT = {
         1: { rx: 0, ry: 0 },
         2: { rx: 0, ry: -90 },
@@ -919,9 +916,7 @@
         rollIcon.classList.add("spin-icon");
         rollIcon.classList.remove("hover-rotate");
         
-        // Haptic feedback on roll start
         haptic("medium");
-
         renderDice();
 
         window.setTimeout(() => {
@@ -933,7 +928,6 @@
           rollIcon.classList.remove("spin-icon");
           rollIcon.classList.add("hover-rotate");
           
-          // Haptic feedback on roll end
           hapticOk();
           sendResult(finalValues);
 
@@ -951,7 +945,6 @@
           });
           if (state.history.length > 50) state.history.length = 50;
 
-          // Re-render dice so CSS animations reset cleanly.
           renderDice();
           renderHistory();
         }, ROLL_DURATION);
@@ -959,7 +952,6 @@
 
       function changeCount(n) {
         if (state.rolling || n === state.count) return;
-        // Haptic feedback on selection
         haptic("light");
         
         state.count = n;
@@ -984,14 +976,15 @@
       function showToast(msg) {
         toastBox.textContent = msg;
         toastEl.style.display = "";
-        // restart animation
         toastBox.style.animation = "none";
         void toastBox.offsetWidth;
         toastBox.style.animation = "";
         window.setTimeout(() => { toastEl.style.display = "none"; }, 2200);
       }
 
-      function canvasSnapshot() {
+      // ── Snapshot Logic (Fixed for Telegram using Blob) ────────────
+      
+      function drawToCanvas() {
         const size = dieSize();
         const gap = 40;
         const padding = 60;
@@ -1062,7 +1055,7 @@
         ctx.fillText(total, bx + 8 + ctx.measureText("Σ ").width, by + 11);
         ctx.restore();
 
-        return canvas.toDataURL('image/png');
+        return canvas;
       }
 
       function roundRect(ctx, x, y, w, h, r) {
@@ -1135,27 +1128,44 @@
           renderDice();
           await new Promise((r) => requestAnimationFrame(r));
 
-          const dataUrl = canvasSnapshot();
+          const canvas = drawToCanvas();
           
-          // Проверяем, запущены ли мы в Telegram
-          const isTelegram = tg && tg.initDataUnsafe && tg.initDataUnsafe.query_id;
+          // Конвертируем Canvas в Blob (это надежнее чем base64 для TG)
+          canvas.toBlob((blob) => {
+            if (!blob) {
+               showToast("Ошибка создания изображения");
+               return;
+            }
+            
+            // Создаем временную ссылку на объект в памяти
+            const url = URL.createObjectURL(blob);
+            
+            // Проверяем среду
+            const isTelegram = tg && tg.initDataUnsafe && tg.initDataUnsafe.query_id;
 
-          if (isTelegram) {
-            // Для Telegram: открываем изображение в новой вкладке/окне
-            // Это позволяет пользователю сохранить его через меню телефона
-            window.open(dataUrl, '_blank');
-            showToast("Снимок открыт для сохранения ✨");
+            if (isTelegram) {
+              // В Telegram открываем Blob URL в новой вкладке. 
+              // Пользователь увидит картинку и сможет сохранить её через меню (долгий тап).
+              window.open(url, '_blank');
+              showToast("Снимок открыт ✨");
+            } else {
+              // В обычном браузере скачиваем
+              const link = document.createElement("a");
+              const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+              link.download = `dice-${stamp}.png`;
+              link.href = url;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              showToast("Снимок сохранён ✨");
+            }
+            
             hapticOk();
-          } else {
-            // Для обычного сайта: скачиваем файл
-            const link = document.createElement("a");
-            const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-            link.download = `dice-${stamp}.png`;
-            link.href = dataUrl;
-            link.click();
-            showToast("Снимок сохранён ✨");
-            hapticOk();
-          }
+            
+            // Очищаем память через пару секунд
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+          }, 'image/png');
 
         } catch (e) {
           console.error(e);
