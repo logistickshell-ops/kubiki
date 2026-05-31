@@ -611,6 +611,68 @@
       }
       .toast-box { transform: none; }
 
+      /* Modal for Snapshot */
+      .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(45, 42, 68, 0.6);
+        backdrop-filter: blur(5px);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      .modal-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .modal-content {
+        background: #fff;
+        padding: 1rem;
+        border-radius: 1.5rem;
+        max-width: 90%;
+        max-height: 90%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+      }
+      .modal-overlay.active .modal-content {
+        transform: scale(1);
+      }
+      .modal-img {
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 1rem;
+      }
+      .modal-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 1rem;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+      }
+      .modal-btn-save {
+        background: var(--accent-deep);
+        color: #fff;
+      }
+      .modal-btn-close {
+        background: #f1f1f1;
+        color: #333;
+      }
+
       /* Hide meta on very small screens */
       @media (max-width: 639px) {
         .hrow-meta { display: none; }
@@ -691,6 +753,17 @@
       </section>
 
       <footer>© <span id="year">2026</span> · light layout</footer>
+    </div>
+
+    <!-- Modal for Snapshot -->
+    <div class="modal-overlay" id="snapshotModal">
+      <div class="modal-content">
+        <img id="modalImg" class="modal-img" src="" alt="Snapshot">
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-save" id="modalSaveBtn">Сохранить / Поделиться</button>
+          <button class="modal-btn modal-btn-close" id="modalCloseBtn">Закрыть</button>
+        </div>
+      </div>
     </div>
 
     <div class="toast" id="toast" style="display:none">
@@ -782,6 +855,13 @@
       const btnClear = $("btnClear");
       const toastEl = $("toast");
       const toastBox = $("toastBox");
+      
+      // Modal refs
+      const modal = $("snapshotModal");
+      const modalImg = $("modalImg");
+      const modalSaveBtn = $("modalSaveBtn");
+      const modalCloseBtn = $("modalCloseBtn");
+      let currentSnapshotUrl = "";
 
       $("year").textContent = new Date().getFullYear();
 
@@ -982,7 +1062,7 @@
         window.setTimeout(() => { toastEl.style.display = "none"; }, 2200);
       }
 
-      // ── Snapshot Logic (Fixed for Telegram using Blob) ────────────
+      // ── Snapshot Logic (Modal Approach) ───────────────────────────
       
       function drawToCanvas() {
         const size = dieSize();
@@ -1129,43 +1209,29 @@
           await new Promise((r) => requestAnimationFrame(r));
 
           const canvas = drawToCanvas();
+          const dataUrl = canvas.toDataURL('image/png');
           
-          // Конвертируем Canvas в Blob (это надежнее чем base64 для TG)
-          canvas.toBlob((blob) => {
-            if (!blob) {
-               showToast("Ошибка создания изображения");
-               return;
-            }
-            
-            // Создаем временную ссылку на объект в памяти
-            const url = URL.createObjectURL(blob);
-            
-            // Проверяем среду
-            const isTelegram = tg && tg.initDataUnsafe && tg.initDataUnsafe.query_id;
+          // Проверяем среду
+          const isTelegram = tg && tg.initDataUnsafe && tg.initDataUnsafe.query_id;
 
-            if (isTelegram) {
-              // В Telegram открываем Blob URL в новой вкладке. 
-              // Пользователь увидит картинку и сможет сохранить её через меню (долгий тап).
-              window.open(url, '_blank');
-              showToast("Снимок открыт ✨");
-            } else {
-              // В обычном браузере скачиваем
-              const link = document.createElement("a");
-              const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-              link.download = `dice-${stamp}.png`;
-              link.href = url;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              showToast("Снимок сохранён ✨");
-            }
-            
+          if (isTelegram) {
+            // В Telegram показываем модальное окно
+            currentSnapshotUrl = dataUrl;
+            modalImg.src = dataUrl;
+            modal.classList.add('active');
             hapticOk();
-            
-            // Очищаем память через пару секунд
-            setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-          }, 'image/png');
+          } else {
+            // В обычном браузере скачиваем
+            const link = document.createElement("a");
+            const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+            link.download = `dice-${stamp}.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Снимок сохранён ✨");
+            hapticOk();
+          }
 
         } catch (e) {
           console.error(e);
@@ -1178,6 +1244,26 @@
           btnSnapshotText.textContent = "Снимок";
         }
       }
+
+      // Modal Handlers
+      modalCloseBtn.addEventListener('click', () => {
+        modal.classList.remove('active');
+      });
+      
+      modalSaveBtn.addEventListener('click', () => {
+        // Пытаемся открыть в новой вкладке для сохранения
+        if (currentSnapshotUrl) {
+           window.open(currentSnapshotUrl, '_blank');
+        }
+        modal.classList.remove('active');
+      });
+
+      // Close modal on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.remove('active');
+        }
+      });
 
       // ── Events ────────────────────────────────────────────────────
       segEl.querySelectorAll("button").forEach((b) => {
